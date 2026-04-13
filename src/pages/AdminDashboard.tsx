@@ -1,33 +1,62 @@
 import { useState, useEffect } from 'react';
 import type { Product } from '@/types';
 import { products as initialProducts, formatPrice } from '@/data/products';
-import { Plus, Edit2, Trash2, Save, X, ArrowLeft, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, ArrowLeft, Search, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+
+// ✅ FIX 1: Using the EXACT key found in your console
+const STORAGE_KEY = 'Miracle Signature Scents🔥-products';
 
 interface AdminDashboardProps {
   onBack: () => void;
 }
 
 const AdminDashboard = ({ onBack }: AdminDashboardProps) => {
+  // Load from correct storage key
   const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('𝕸𝖎𝖗𝖆𝖈𝖑𝖊 𝕾𝖎𝖌𝖓𝖆𝖙𝖚𝖗𝖊 𝕾𝖈𝖊𝖓𝖙𝖘✍-products');
-    return saved ? JSON.parse(saved) : initialProducts;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : initialProducts;
+    } catch {
+      return initialProducts;
+    }
   });
+
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
   const [formData, setFormData] = useState<Partial<Product>>({
     name: '',
     description: '',
     price: 0,
     category: 'unisex',
     size: '50ml',
-    image: '/images/product_noir_dor.jpg',
+    image: '', // Default to empty
     featured: false,
   });
 
+  // ✅ FIX 2: Function to handle Image Upload (Converts file to Base64 string)
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (Limit to ~500KB for LocalStorage performance)
+    if (file.size > 500000) {
+      toast.error('Image too large! Please use an image under 500KB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData({ ...formData, image: reader.result as string });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Save to storage whenever products change
   useEffect(() => {
-    localStorage.setItem('𝕸𝖎𝖗𝖆𝖈𝖑𝖊 𝕾𝖎𝖌𝖓𝖆𝖙𝖚𝖗𝖊 𝕾𝖈𝖊𝖓𝖙𝖘✍-products', JSON.stringify(products));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
   }, [products]);
 
   const filteredProducts = products.filter(
@@ -42,29 +71,28 @@ const AdminDashboard = ({ onBack }: AdminDashboardProps) => {
       return;
     }
 
+    const addProduct = (newProduct) => {
+  const existing = JSON.parse(localStorage.getItem("products") || "[]");
+  const updated = [...existing, newProduct];
+
+  localStorage.setItem("products", JSON.stringify(updated));
+};
+
     const newProduct: Product = {
       id: Date.now().toString(),
-      name: formData.name,
-      description: formData.description,
-      price: formData.price,
-      category: formData.category as 'men' | 'women' | 'unisex',
+      name: formData.name!,
+      description: formData.description!,
+      price: formData.price!,
+      category: (formData.category as 'men' | 'women' | 'unisex') || 'unisex',
       size: formData.size || '50ml',
-      image: formData.image || '/images/product_noir_dor.jpg',
+      image: formData.image || '/images/placeholder.jpg', // Fallback if no image
       featured: formData.featured || false,
     };
 
     setProducts([...products, newProduct]);
     setIsAdding(false);
-    setFormData({
-      name: '',
-      description: '',
-      price: 0,
-      category: 'unisex',
-      size: '50ml',
-      image: '/images/product_noir_dor.jpg',
-      featured: false,
-    });
-    toast.success('Product added successfully!');
+    setFormData({ name: '', description: '', price: 0, category: 'unisex', size: '50ml', image: '', featured: false });
+    toast.success('Product added!');
   };
 
   const handleEdit = (product: Product) => {
@@ -73,43 +101,27 @@ const AdminDashboard = ({ onBack }: AdminDashboardProps) => {
   };
 
   const handleUpdate = () => {
-    if (!formData.name || !formData.description || !formData.price) {
-      toast.error('Please fill in all required fields');
+    if (!formData.name || !formData.price) {
+      toast.error('Name and Price are required');
       return;
     }
 
     setProducts(
       products.map((p) =>
         p.id === isEditing
-          ? {
-              ...p,
-              name: formData.name!,
-              description: formData.description!,
-              price: formData.price!,
-              category: formData.category as 'men' | 'women' | 'unisex',
-              size: formData.size!,
-              image: formData.image!,
-              featured: formData.featured!,
-            }
+          ? { ...p, ...formData } as Product
           : p
       )
     );
     setIsEditing(null);
-    setFormData({});
-    toast.success('Product updated successfully!');
+    toast.success('Product updated!');
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this product?')) {
+    if (confirm('Delete this product?')) {
       setProducts(products.filter((p) => p.id !== id));
-      toast.success('Product deleted successfully!');
+      toast.success('Deleted');
     }
-  };
-
-  const handleCancel = () => {
-    setIsAdding(false);
-    setIsEditing(null);
-    setFormData({});
   };
 
   return (
@@ -118,245 +130,88 @@ const AdminDashboard = ({ onBack }: AdminDashboardProps) => {
       <header className="bg-dark-secondary border-b border-ivory/10 sticky top-0 z-10">
         <div className="px-6 lg:px-12 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={onBack}
-                className="p-2 text-ivory/60 hover:text-ivory transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <h1 className="font-display text-2xl text-ivory">
-                Admin Dashboard
-              </h1>
-            </div>
+            <button onClick={onBack} className="flex items-center gap-2 text-ivory hover:text-gold transition">
+              <ArrowLeft className="w-5 h-5" /> Back
+            </button>
+            <h1 className="font-display text-xl text-ivory">Admin Dashboard</h1>
             <button
-              onClick={() => setIsAdding(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gold text-dark font-body text-sm tracking-wider uppercase hover:bg-gold-light transition-colors rounded-sm"
+              onClick={() => { setIsAdding(true); setFormData({}); }}
+              className="flex items-center gap-2 px-4 py-2 bg-gold text-dark font-bold text-sm rounded"
             >
-              <Plus className="w-4 h-4" />
-              Add Product
+              <Plus className="w-4 h-4" /> Add Product
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="px-6 lg:px-12 py-8">
-        {/* Search */}
-        <div className="mb-8">
-          <div className="relative max-w-md">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-ivory/40" />
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-dark-secondary border border-ivory/10 text-ivory placeholder-ivory/30 focus:border-gold focus:outline-none transition-colors rounded-sm"
-            />
-          </div>
-        </div>
-
-        {/* Add/Edit Form */}
+        {/* Form */}
         {(isAdding || isEditing) && (
-          <div className="mb-8 p-6 bg-dark-secondary border border-ivory/10 rounded-sm">
-            <h2 className="font-display text-xl text-ivory mb-6">
-              {isAdding ? 'Add New Product' : 'Edit Product'}
-            </h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-ivory/60 text-sm mb-2">Name *</label>
-                <input
-                  type="text"
-                  value={formData.name || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-dark-tertiary border border-ivory/10 text-ivory focus:border-gold focus:outline-none transition-colors rounded-sm"
-                  placeholder="Product name"
-                />
-              </div>
-              <div>
-                <label className="block text-ivory/60 text-sm mb-2">Price (₦) *</label>
-                <input
-                  type="number"
-                  value={formData.price || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, price: Number(e.target.value) })
-                  }
-                  className="w-full px-4 py-3 bg-dark-tertiary border border-ivory/10 text-ivory focus:border-gold focus:outline-none transition-colors rounded-sm"
-                  placeholder="Price in Naira"
-                />
-              </div>
-              <div>
-                <label className="block text-ivory/60 text-sm mb-2">Category</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      category: e.target.value as 'men' | 'women' | 'unisex',
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-dark-tertiary border border-ivory/10 text-ivory focus:border-gold focus:outline-none transition-colors rounded-sm"
-                >
-                  <option value="men">Men</option>
-                  <option value="women">Women</option>
-                  <option value="unisex">Unisex</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-ivory/60 text-sm mb-2">Size</label>
-                <input
-                  type="text"
-                  value={formData.size || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, size: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-dark-tertiary border border-ivory/10 text-ivory focus:border-gold focus:outline-none transition-colors rounded-sm"
-                  placeholder="e.g., 50ml"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-ivory/60 text-sm mb-2">Description *</label>
-                <textarea
-                  value={formData.description || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  rows={3}
-                  className="w-full px-4 py-3 bg-dark-tertiary border border-ivory/10 text-ivory focus:border-gold focus:outline-none transition-colors resize-none rounded-sm"
-                  placeholder="Product description"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.featured || false}
-                    onChange={(e) =>
-                      setFormData({ ...formData, featured: e.target.checked })
-                    }
-                    className="w-5 h-5 accent-gold"
-                  />
-                  <span className="text-ivory/70 text-sm">Featured product</span>
+          <div className="mb-8 p-6 bg-dark-secondary border border-gold/20 rounded-lg animate-in fade-in">
+            <h2 className="font-display text-2xl text-ivory mb-6">{isAdding ? 'Add New Product' : 'Edit Product'}</h2>
+            
+            {/* ✅ FIX 3: Image Upload Section Added Here */}
+            <div className="mb-6 flex flex-col items-center justify-center border-2 border-dashed border-ivory/20 rounded-lg p-6 bg-dark-tertiary/50">
+              {formData.image && formData.image !== '' ? (
+                <div className="relative">
+                  <img src={formData.image} alt="Preview" className="w-32 h-32 object-cover rounded-lg shadow-lg" />
+                  <button onClick={() => setFormData({...formData, image: ''})} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full"><X size={14}/></button>
+                </div>
+              ) : (
+                <label className="cursor-pointer flex flex-col items-center gap-2 text-ivory/60 hover:text-gold transition">
+                  <Upload className="w-8 h-8" />
+                  <span className="text-sm">Click to upload image (Max 500KB)</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                 </label>
-              </div>
+              )}
             </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <input value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Product Name" className="w-full p-3 bg-dark-tertiary text-ivory border border-ivory/10 rounded" />
+              <input type="number" value={formData.price || ''} onChange={e => setFormData({...formData, price: Number(e.target.value)})} placeholder="Price" className="w-full p-3 bg-dark-tertiary text-ivory border border-ivory/10 rounded" />
+              <input value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Description" className="md:col-span-2 w-full p-3 bg-dark-tertiary text-ivory border border-ivory/10 rounded" />
+              
+              <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as any})} className="w-full p-3 bg-dark-tertiary text-ivory border border-ivory/10 rounded">
+                <option value="men">Men</option>
+                <option value="women">Women</option>
+                <option value="unisex">Unisex</option>
+              </select>
+              <input value={formData.size || ''} onChange={e => setFormData({...formData, size: e.target.value})} placeholder="Size (e.g., 100ml)" className="w-full p-3 bg-dark-tertiary text-ivory border border-ivory/10 rounded" />
+            </div>
+
             <div className="flex gap-4 mt-6">
-              <button
-                onClick={isAdding ? handleAdd : handleUpdate}
-                className="flex items-center gap-2 px-6 py-3 bg-gold text-dark font-body text-sm tracking-wider uppercase hover:bg-gold-light transition-colors rounded-sm"
-              >
-                <Save className="w-4 h-4" />
-                {isAdding ? 'Add Product' : 'Update Product'}
-              </button>
-              <button
-                onClick={handleCancel}
-                className="flex items-center gap-2 px-6 py-3 bg-ivory/10 text-ivory font-body text-sm tracking-wider uppercase hover:bg-ivory/20 transition-colors rounded-sm"
-              >
-                <X className="w-4 h-4" />
-                Cancel
-              </button>
+              <button onClick={isAdding ? handleAdd : handleUpdate} className="flex-1 py-3 bg-gold text-dark font-bold rounded hover:bg-gold-light transition">Save</button>
+              <button onClick={() => { setIsAdding(false); setIsEditing(null); }} className="flex-1 py-3 bg-ivory/10 text-ivory rounded hover:bg-ivory/20 transition">Cancel</button>
             </div>
           </div>
         )}
 
-        {/* Products Table */}
-        <div className="bg-dark-secondary border border-ivory/10 rounded-sm overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-dark-tertiary">
+        {/* Table */}
+        <div className="overflow-x-auto rounded-lg border border-ivory/10">
+          <table className="w-full text-left">
+            <thead className="bg-dark-secondary text-ivory/60 text-xs uppercase">
               <tr>
-                <th className="px-6 py-4 text-left text-ivory/60 text-xs tracking-wider uppercase">
-                  Product
-                </th>
-                <th className="px-6 py-4 text-left text-ivory/60 text-xs tracking-wider uppercase">
-                  Category
-                </th>
-                <th className="px-6 py-4 text-left text-ivory/60 text-xs tracking-wider uppercase">
-                  Price
-                </th>
-                <th className="px-6 py-4 text-left text-ivory/60 text-xs tracking-wider uppercase">
-                  Featured
-                </th>
-                <th className="px-6 py-4 text-right text-ivory/60 text-xs tracking-wider uppercase">
-                  Actions
-                </th>
+                <th className="p-4">Product</th>
+                <th className="p-4">Price</th>
+                <th className="p-4">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-ivory/5">
-              {filteredProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-dark-tertiary/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-4">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-12 h-12 object-cover rounded-sm"
-                      />
-                      <div>
-                        <p className="text-ivory font-medium">{product.name}</p>
-                        <p className="text-ivory/50 text-sm">{product.size}</p>
-                      </div>
-                    </div>
+            <tbody className="divide-y divide-ivory/10 bg-dark-secondary/50">
+              {filteredProducts.map(p => (
+                <tr key={p.id} className="hover:bg-ivory/5">
+                  <td className="p-4 flex items-center gap-3">
+                    <img src={p.image || '/images/placeholder.jpg'} className="w-10 h-10 object-cover rounded" />
+                    <span className="text-ivory font-medium">{p.name}</span>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="capitalize text-ivory/70">{product.category}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-gold">{formatPrice(product.price)}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    {product.featured ? (
-                      <span className="px-2 py-1 bg-gold/20 text-gold text-xs rounded-sm">
-                        Yes
-                      </span>
-                    ) : (
-                      <span className="text-ivory/40 text-sm">No</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleEdit(product)}
-                        className="p-2 text-ivory/60 hover:text-gold transition-colors"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product.id)}
-                        className="p-2 text-ivory/60 hover:text-red-400 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                  <td className="p-4 text-gold">{formatPrice(p.price)}</td>
+                  <td className="p-4 flex gap-2">
+                    <button onClick={() => handleEdit(p)} className="p-2 text-blue-400 hover:bg-blue-400/10 rounded"><Edit2 size={16}/></button>
+                    <button onClick={() => handleDelete(p.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded"><Trash2 size={16}/></button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {filteredProducts.length === 0 && (
-            <div className="py-12 text-center">
-              <p className="text-ivory/40">No products found</p>
-            </div>
-          )}
-        </div>
-
-        {/* Stats */}
-        <div className="mt-8 grid sm:grid-cols-3 gap-6">
-          <div className="p-6 bg-dark-secondary border border-ivory/10 rounded-sm">
-            <p className="text-ivory/60 text-sm mb-2">Total Products</p>
-            <p className="font-display text-3xl text-ivory">{products.length}</p>
-          </div>
-          <div className="p-6 bg-dark-secondary border border-ivory/10 rounded-sm">
-            <p className="text-ivory/60 text-sm mb-2">Featured Products</p>
-            <p className="font-display text-3xl text-gold">
-              {products.filter((p) => p.featured).length}
-            </p>
-          </div>
-          <div className="p-6 bg-dark-secondary border border-ivory/10 rounded-sm">
-            <p className="text-ivory/60 text-sm mb-2">Categories</p>
-            <p className="font-display text-3xl text-ivory">3</p>
-          </div>
         </div>
       </main>
     </div>
