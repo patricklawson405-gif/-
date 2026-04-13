@@ -15,17 +15,45 @@ import Footer from '@/sections/Footer';
 import AdminDashboard from '@/pages/AdminDashboard';
 
 import { useCart } from '@/hooks/useCart';
-import { products } from '@/data/products';
+import { products as initialProducts } from '@/data/products';
+import type { Product } from '@/types';
 
 gsap.registerPlugin(ScrollTrigger);
 
+// ✅ Storage key must match AdminDashboard exactly
+const STORAGE_KEY = 'Miracle Signature Scents🔥-products';
+
 function App() {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [products, setProducts] = useState<Product[]>(initialProducts);
   const { cart, isOpen, setIsOpen, addToCart, removeFromCart, updateQuantity, totalItems, totalPrice } = useCart();
+
+  // ✅ Load products from localStorage on mount + listen for changes
+  useEffect(() => {
+    const loadProducts = () => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setProducts(parsed);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load products from localStorage:', e);
+      }
+      // Fallback to initial products if localStorage is empty/invalid
+      setProducts(initialProducts);
+    };
+
+    loadProducts();
+    window.addEventListener('storage', loadProducts);
+    return () => window.removeEventListener('storage', loadProducts);
+  }, []);
 
   // Global scroll snap for pinned sections
   useEffect(() => {
-    // Wait for all ScrollTriggers to be created
     const timeout = setTimeout(() => {
       const pinned = ScrollTrigger.getAll()
         .filter((st) => st.vars.pin)
@@ -44,14 +72,12 @@ function App() {
       ScrollTrigger.create({
         snap: {
           snapTo: (value: number) => {
-            // Check if within any pinned range (with small buffer)
             const inPinned = pinnedRanges.some(
               (r) => value >= r.start - 0.02 && value <= r.end + 0.02
             );
             
-            if (!inPinned) return value; // Flowing section: free scroll
+            if (!inPinned) return value;
 
-            // Find nearest pinned center
             const target = pinnedRanges.reduce(
               (closest, r) =>
                 Math.abs(r.center - value) < Math.abs(closest - value)
@@ -84,7 +110,7 @@ function App() {
   // Keyboard shortcut for admin (Ctrl + Shift + A)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'A') {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
         e.preventDefault();
         setIsAdmin(true);
       }
@@ -124,7 +150,7 @@ function App() {
       {/* Main Content */}
       <main className="relative">
         {/* Section 1: Hero - z-10 */}
-        <Hero />
+        <Hero products={products} onAddToCart={addToCart} />
 
         {/* Section 2: Elegant - z-20 */}
         <StatementSection
@@ -173,7 +199,7 @@ function App() {
         />
 
         {/* Section 6: Collection - Flowing */}
-        <Collection onAddToCart={addToCart} />
+        <Collection products={products} onAddToCart={addToCart} />
 
         {/* Section 7: Services - Flowing */}
         <Services />
