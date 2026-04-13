@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Product } from '../../types';
+import type { Product } from '@/types';
 import { products as initialProducts, formatPrice } from '@/data/products';
 import { Plus, Edit2, Trash2, Save, X, ArrowLeft, Search, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 // ✅ FIX 1: Using the EXACT key found in your console
-const STORAGE_KEY = 'Miracle Signature Scents-products';
+const STORAGE_KEY = 'Miracle Signature Scents🔥-products';
 
 interface AdminDashboardProps {
   onBack: () => void;
