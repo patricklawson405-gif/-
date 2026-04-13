@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import type { Product } from '@/types';
-import { products, formatPrice } from '@/data/products';
+import { products as initialProducts, formatPrice } from '@/data/products';
 import { ShoppingBag } from 'lucide-react';
 
 gsap.registerPlugin(ScrollTrigger);
 
 interface CollectionProps {
+  products?: Product[];
   onAddToCart: (product: Product) => void;
 }
 
-const Collection = ({ onAddToCart }: CollectionProps) => {
+const Collection = ({ products = initialProducts, onAddToCart }: CollectionProps) => {
   const sectionRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLDivElement>(null);
   const filtersRef = useRef<HTMLDivElement>(null);
@@ -33,10 +34,10 @@ const Collection = ({ onAddToCart }: CollectionProps) => {
   useEffect(() => {
     const section = sectionRef.current;
     const heading = headingRef.current;
-    const filters = filtersRef.current;
+    const filtersEl = filtersRef.current;
     const grid = gridRef.current;
 
-    if (!section || !heading || !filters || !grid) return;
+    if (!section || !heading || !filtersEl || !grid) return;
 
     const ctx = gsap.context(() => {
       // Heading animation
@@ -58,7 +59,7 @@ const Collection = ({ onAddToCart }: CollectionProps) => {
 
       // Filters animation
       gsap.fromTo(
-        filters.children,
+        Array.from(filtersEl.children),
         { y: 24, opacity: 0 },
         {
           y: 0,
@@ -67,7 +68,7 @@ const Collection = ({ onAddToCart }: CollectionProps) => {
           stagger: 0.05,
           ease: 'power3.out',
           scrollTrigger: {
-            trigger: filters,
+            trigger: filtersEl,
             start: 'top 85%',
             toggleActions: 'play none none reverse',
           },
@@ -147,6 +148,9 @@ const Collection = ({ onAddToCart }: CollectionProps) => {
                   src={product.image}
                   alt={product.name}
                   className="w-full aspect-[3/4] object-cover group-hover:scale-105 transition-transform duration-500"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/images/placeholder.jpg';
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-dark/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </div>
@@ -172,6 +176,7 @@ const Collection = ({ onAddToCart }: CollectionProps) => {
                   <button
                     onClick={() => onAddToCart(product)}
                     className="p-2.5 bg-gold/10 text-gold hover:bg-gold hover:text-dark transition-all duration-300 rounded-sm"
+                    aria-label={`Add ${product.name} to cart`}
                   >
                     <ShoppingBag className="w-5 h-5" />
                   </button>
